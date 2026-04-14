@@ -56,18 +56,33 @@ For each finding, capture:
 - "Complex" code that is inherently complex domain logic
 - Style preferences that aren't bugs
 
-## Phase 4: Verify PR exists
+## Phase 4: Check if GitHub posting is possible
 
-Run this to get the PR number and head SHA:
+First, check if `gh` CLI is available and if there's an open PR:
+
+```bash
+command -v gh >/dev/null 2>&1 && echo "GH_AVAILABLE" || echo "GH_MISSING"
+```
+
+If `gh` is available, get the PR info:
 
 ```bash
 gh pr view --json number,headRefOid,title,baseRefName
 ```
 
-If no PR exists for this branch, STOP and output:
-"No open PR found for this branch. Use `/review` for local review instead."
+**Three possible outcomes:**
+
+| Situation | Action |
+|---|---|
+| `gh` not installed | **Fallback to terminal output** (same format as `/review`) with a note: "⚠ `gh` CLI not found. Showing review in terminal. Install `gh` and run `/review-pr` again to post inline comments on GitHub." |
+| `gh` available but no open PR | **Fallback to terminal output** with a note: "⚠ No open PR found for this branch. Showing review in terminal. Push your branch and open a PR, then run `/review-pr` again." |
+| `gh` available and PR exists | **Continue to Phase 5** to post inline comments |
+
+When falling back, use the exact same output format as the `/review` command (Findings by File tables), but prepend the warning note at the top.
 
 ## Phase 5: Post Review to GitHub
+
+This phase only runs if `gh` is available AND an open PR exists.
 
 Build the review payload and post it via `gh api`.
 
