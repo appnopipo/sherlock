@@ -44,8 +44,14 @@ Use this exact format (keep under 30 lines total):
 **Range**: [range from meta.txt]
 **Files**: N total (X source, Y test) | +A -D lines
 
-[If flags found, one line each:]
-- [FLAG_TYPE] `file:line` — description
+[If flags found, list by file:]
+
+### `src/components/Example.tsx`
+
+| Line | Flag | Comment |
+|------|------|---------|
+| 23 | SECRET | Hardcoded API key in assignment |
+| 45 | DEBUG | `console.log` left in production code |
 
 [If no flags:]
 All clear. No red flags detected in diff.

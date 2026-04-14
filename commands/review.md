@@ -73,36 +73,48 @@ Generate the review in this exact format:
 
 [1-2 sentence summary of what the PR does and overall assessment]
 
-## Findings
+## Findings by File
 
-### P1 Critical
-- **[category]** `file:line` — [description]. Evidence: [why P1]. Suggestion: [fix]
+Group all findings by file path. Within each file, list issues ordered by line number.
 
-### P2 High
-- **[category]** `file:line` — [description]. Evidence: [why P2]. Suggestion: [fix]
+### `src/components/Example.tsx`
 
-### P3 Medium
-- **[category]** `file:line` — [description]. Suggestion: [fix]
+| Line | Severity | Comment |
+|------|----------|---------|
+| 12 | P2 | Unsanitized user input passed to `dangerouslySetInnerHTML` — no DOMPurify in chain |
+| 45 | P4 | Magic number `86400` — extract to named constant (SECONDS_PER_DAY) |
+| 78 | P3 | Missing `await` on async call — promise result is silently discarded |
 
-### P4 Low
-- **[category]** `file:line` — [description]. Suggestion: [fix]
+### `src/services/api.ts`
 
-## Pre-computed Signals
+| Line | Severity | Comment |
+|------|----------|---------|
+| 23 | P4 | Catch block returns empty array — consider discriminated union for error state |
+
+[Repeat for each file with findings. Omit files with no findings.]
+
+## Summary
+
+| Severity | Count |
+|----------|-------|
+| P1 Critical | N |
+| P2 High | N |
+| P3 Medium | N |
+| P4 Low | N |
 
 **Lint**: [summary from lint-results.txt or "Clean"]
 **Types**: [summary from typecheck-results.txt or "Clean"]
 **Tests**: [summary from test-hint.txt or "All changed source files have tests"]
 
-## Stats
-
-- Diff: [raw lines] raw → [filtered lines] filtered ([X]% noise removed)
-- Categories: [breakdown from files-classified.txt]
+**Diff**: [raw lines] raw → [filtered lines] filtered ([X]% noise removed)
 ```
 
 **Output rules:**
-- Omit empty severity sections entirely (no "### P1 Critical" if no P1s)
-- Do NOT include code snippets — use `file:line` references only
+- Group findings by file, ordered by line number within each file
+- Omit files with no findings
+- Each comment is a brief, actionable English sentence
+- For P1/P2, include evidence in the comment (why it's critical)
+- Do NOT include code snippets — the line number is the reference
 - Do NOT echo diff content back — the reviewer already has it
-- Keep each finding to ONE line
 - Verdict is REQUEST_CHANGES only if P1 or P2 findings exist
 - Total output under 200 lines
