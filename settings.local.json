@@ -11,6 +11,7 @@
       "Bash(git shortlog:*)",
       "Bash(gh pr:*)",
       "Bash(gh api:*)",
+      "Bash(gh repo:*)",
       "Bash(.claude/scripts/collect-pr-data.sh:*)",
       "Bash(.claude/scripts/classify-files.sh:*)",
       "Bash(.claude/scripts/filter-noise.sh:*)",

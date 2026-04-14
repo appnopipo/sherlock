@@ -17,6 +17,7 @@ git clone https://github.com/appnopipo/sherlock.git
 
 # In Claude Code, inside your project:
 /review              # Full PR review against main
+/review-pr           # Same as /review but posts inline comments on GitHub PR
 /review-quick        # Ultra-fast gate check
 /review-commit last  # Review the last commit
 ```
@@ -150,6 +151,38 @@ Review specific commit(s). Same analysis pipeline as `/review` but scoped to com
 /review-commit abc1234      # Review specific commit
 ```
 
+### `/review-pr [base-branch]`
+
+Same analysis as `/review`, but instead of terminal output, **posts findings as inline comments directly on the GitHub PR**. Each issue appears on the exact line of the diff where it was found.
+
+```
+/review-pr              # Auto-detects base branch
+/review-pr develop      # Diff against develop
+```
+
+Requires: `gh` CLI authenticated with repo access.
+
+**How it works:**
+1. Runs the same data collection and analysis pipeline as `/review`
+2. Detects the open PR for the current branch via `gh pr view`
+3. Builds a review payload with inline comments (one per finding)
+4. Posts via GitHub API: `POST /repos/{owner}/{repo}/pulls/{number}/reviews`
+
+**Review event mapping:**
+| Findings | GitHub Review Event |
+|---|---|
+| Any P1 or P2 | `REQUEST_CHANGES` |
+| Only P3/P4 | `COMMENT` |
+| No findings | `APPROVE` |
+
+Each inline comment follows the format: `**[severity] [category]** — [description]. [suggestion]`
+
+**Example output on GitHub:**
+
+> **P2 Security** — Unsanitized user input passed to `res.redirect()` — open redirect vulnerability. Consider validating against an allowlist of internal paths.
+
+This is ideal for CI/CD pipelines where you want findings to appear directly in the PR diff view.
+
 ## Severity Model
 
 All findings default to **P4 (Low)**. Promotion requires documented evidence — a false P1 wastes more developer time than a missed P4.
@@ -176,9 +209,9 @@ The result is typically **40–70% smaller** than the raw diff.
 
 ## CI/CD Integration
 
-### GitHub Actions
+### GitHub Actions — Inline PR Comments (recommended)
 
-Use the [Claude Code GitHub Action](https://github.com/anthropics/claude-code-action) to run Sherlock automatically on every PR:
+Use `/review-pr` with the [Claude Code GitHub Action](https://github.com/anthropics/claude-code-action) to post findings as **inline comments on the exact lines** of the PR diff:
 
 ```yaml
 # .github/workflows/sherlock-review.yml
@@ -191,6 +224,8 @@ on:
 jobs:
   review:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -199,12 +234,29 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "/review-pr ${{ github.event.pull_request.base.ref }}"
+```
+
+This creates a proper GitHub review with:
+- `REQUEST_CHANGES` if P1/P2 issues found
+- `COMMENT` if only P3/P4
+- `APPROVE` if no issues
+- Each finding as an inline comment on the exact diff line
+
+### GitHub Actions — Markdown Comment
+
+For a simpler approach that posts a single markdown comment (not inline):
+
+```yaml
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: "/review ${{ github.event.pull_request.base.ref }}"
 ```
 
-This posts the review as a comment on the PR automatically.
+### GitHub Actions — Gate Check Only
 
-For a lighter check on every push (gate check only):
+For a lightweight check on every push:
 
 ```yaml
       - uses: anthropics/claude-code-action@v1
@@ -281,7 +333,8 @@ sherlock/
 ├── install.sh                    # Granular symlink installer
 ├── uninstall.sh                  # Clean removal (preserves other toolkits)
 ├── commands/
-│   ├── review.md                 # /review — Full PR review
+│   ├── review.md                 # /review — Full PR review (terminal output)
+│   ├── review-pr.md              # /review-pr — Posts inline comments on GitHub PR
 │   ├── review-quick.md           # /review-quick — Gate check
 │   └── review-commit.md          # /review-commit — Commit review
 ├── scripts/
