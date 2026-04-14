@@ -1,0 +1,10 @@
+# Sherlock runtime output
+.review/
+
+# OS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~

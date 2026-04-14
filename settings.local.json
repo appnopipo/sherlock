@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git merge-base:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git shortlog:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh api:*)",
+      "Bash(.claude/scripts/collect-pr-data.sh:*)",
+      "Bash(.claude/scripts/classify-files.sh:*)",
+      "Bash(.claude/scripts/filter-noise.sh:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm type-check:*)",
+      "Read(.review/*)"
+    ],
+    "deny": []
+  }
+}
