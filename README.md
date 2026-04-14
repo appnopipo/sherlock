@@ -1,4 +1,4 @@
-# Sherlock
+# 🔍 Sherlock
 
 **Fast, token-efficient PR code review for Claude Code CLI.**
 
