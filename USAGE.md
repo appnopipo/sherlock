@@ -1,18 +1,24 @@
-# Sherlock — PR Code Review Toolkit for Claude Code
+# Sherlock — PR Code Review Toolkit
 
-Fast, token-efficient PR code review powered by Claude Code CLI.
+Fast, token-efficient PR code review for Claude Code and Roo Code.
 
 ## Install
 
 ```bash
-# Install in your project (granular symlinks — compatible with Alfred)
+# Auto-detect targets (Claude Code / Roo Code)
 ./install.sh /path/to/your/project
+
+# Force specific target
+./install.sh /path/to/your/project --claude
+./install.sh /path/to/your/project --roo
+./install.sh /path/to/your/project --all
 
 # Uninstall (removes only Sherlock files)
 ./uninstall.sh /path/to/your/project
 ```
 
-Requires: `git`, standard unix tools. Optional: `eslint`, `tsc`, `gh` CLI.
+**Requires**: `git`, standard unix tools (awk, sed, grep).
+**Optional**: `eslint`, `tsc` (lint/type checking), `gh` CLI (PR metadata + inline comments), `jq` (permission merging).
 
 ## Commands
 
@@ -25,7 +31,18 @@ Full PR review. Collects diff data, runs lint/typecheck, analyzes against 5 cate
 /review develop    # Diff against develop branch
 ```
 
-**Output**: Structured report with findings by severity (P1-P4), pre-computed signals, stats.
+**Output**: Structured report with findings grouped by file, line-level comments, severity (P1-P4).
+
+### `/review-pr [base-branch]`
+
+Same analysis as `/review`, but posts findings as **inline comments directly on the GitHub PR**. Each issue appears on the exact diff line. Falls back to terminal output if `gh` is not installed or no PR exists.
+
+```
+/review-pr              # Auto-detects base branch
+/review-pr develop      # Diff against develop
+```
+
+**Requires**: `gh` CLI authenticated with repo access.
 
 ### `/review-quick [base-branch]`
 
@@ -72,23 +89,88 @@ Review specific commit(s).
 
 **Token budget** (medium PR, ~150 lines): ~4,000 tokens vs. ~30,000 naive approach.
 
+## Multi-Editor Support
+
+The installer auto-detects which editor(s) your project uses:
+
+| Component | Claude Code | Roo Code |
+|---|---|---|
+| Commands | `.claude/commands/*.md` | `.roo/commands/*.md` |
+| Rules | `.claude/rules/*.md` | `.roo/rules/*.md` |
+| Scripts | `.sherlock/scripts/` (shared) | `.sherlock/scripts/` (shared) |
+| Permissions | `.claude/settings.local.json` | `.roomodes` (custom mode) |
+
+Scripts live in `.sherlock/scripts/` — a neutral path shared by both editors. Commands and rules are symlinked to each editor's expected directory with identical content.
+
+For Roo Code, the installer creates a `sherlock` custom mode with read + command permissions.
+
+## CI/CD Integration
+
+### GitHub Actions — Inline PR Comments
+
+```yaml
+# .github/workflows/sherlock-review.yml
+name: Sherlock PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "/review-pr ${{ github.event.pull_request.base.ref }}"
+```
+
+### GitHub Actions — Gate Check Only
+
+```yaml
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "/review-quick ${{ github.event.pull_request.base.ref }}"
+```
+
+### Standalone Pipeline (without Claude Code CLI)
+
+The data collection scripts are plain bash:
+
+```yaml
+- name: Collect PR data
+  run: .sherlock/scripts/collect-pr-data.sh --base=${{ github.event.pull_request.base.ref }}
+
+- name: Review with Claude API
+  run: |
+    DIFF=$(cat .review/diff-filtered.patch)
+    STATS=$(cat .review/diff-stats.txt)
+    # Call Claude API with the pre-computed data
+    # Post result as PR comment
+```
+
 ## Compatibility
 
 ### With Alfred (Code Quality Toolkit)
 
-Both tools can coexist in the same project:
+Both tools coexist with zero conflicts. Alfred uses `quality-*` prefixes, Sherlock uses `review-*`. Permissions are merged automatically.
 
 ```bash
-# Install both
 /path/to/alfred/install.sh /your/project
 /path/to/sherlock/install.sh /your/project
 ```
 
-No conflicts — Alfred uses `quality-*` prefixes, Sherlock uses `review-*`. Permissions are merged automatically.
-
 ### With Claude Code Review (REVIEW.md)
 
-If your project has a `REVIEW.md` (used by Claude's managed Code Review service), Sherlock reads it as additional guidelines — fully complementary.
+If your project has a `REVIEW.md`, Sherlock reads it as additional review guidelines — fully complementary.
 
 ## Severity Model
 
@@ -105,18 +187,19 @@ All findings default to P4 (Low). Promotion requires documented evidence:
 
 ```
 sherlock/
-├── install.sh / uninstall.sh    # Granular symlink installer
-├── commands/                     # Claude Code slash commands
-│   ├── review.md                # /review — Full PR review
-│   ├── review-quick.md          # /review-quick — Gate check
-│   └── review-commit.md         # /review-commit — Commit review
-├── scripts/                     # Bash data collection
-│   ├── collect-pr-data.sh       # Orchestrator (parallel execution)
-│   ├── classify-files.sh        # File categorization
-│   └── filter-noise.sh          # Diff noise removal
-├── rules/                       # Auto-loaded by Claude Code
-│   ├── SEVERITY.md              # Inverted severity model
-│   ├── TOKEN-ECONOMY.md         # Token optimization rules
-│   └── REVIEW-PRINCIPLES.md     # 5 review categories
-└── settings.local.json          # Permissions
+├── install.sh / uninstall.sh      # Multi-target symlink installer
+├── commands/                       # Slash commands (→ .claude/ and/or .roo/)
+│   ├── review.md                  # /review — Full PR review
+│   ├── review-pr.md               # /review-pr — Inline comments on GitHub PR
+│   ├── review-quick.md            # /review-quick — Gate check
+│   └── review-commit.md           # /review-commit — Commit review
+├── scripts/                       # Bash data collection (→ .sherlock/scripts/)
+│   ├── collect-pr-data.sh         # Orchestrator (parallel execution)
+│   ├── classify-files.sh          # File categorization
+│   └── filter-noise.sh            # Diff noise removal (40-70% reduction)
+├── rules/                         # AI rules (→ .claude/ and/or .roo/)
+│   ├── SEVERITY.md                # Inverted severity model
+│   ├── TOKEN-ECONOMY.md           # Token optimization rules
+│   └── REVIEW-PRINCIPLES.md       # 5 review categories
+└── settings.local.json            # Claude Code permissions template
 ```
