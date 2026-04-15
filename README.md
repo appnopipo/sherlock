@@ -1,8 +1,8 @@
 # 🔍 Sherlock
 
-**Fast, token-efficient PR code review for Claude Code CLI.**
+**Fast, token-efficient PR code review for Claude Code and Roo Code.**
 
-Sherlock is a code review toolkit that integrates with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to review pull requests. It was built around two priorities: **speed** (reviews complete in seconds, not minutes) and **token economy** (uses ~4k tokens for a medium PR where naive approaches consume ~30k).
+Sherlock is a code review toolkit that integrates with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Roo Code](https://docs.roocode.com/) to review pull requests. It was built around two priorities: **speed** (reviews complete in seconds, not minutes) and **token economy** (uses ~4k tokens for a medium PR where naive approaches consume ~30k).
 
 The key insight: Bash does the heavy lifting *before* AI sees anything. Diffs are collected, files are classified, noise is stripped, and lint/typecheck run in parallel — all before a single token is spent. The AI receives only what it needs to make decisions.
 
@@ -12,10 +12,15 @@ The key insight: Bash does the heavy lifting *before* AI sees anything. Diffs ar
 # Clone
 git clone https://github.com/appnopipo/sherlock.git
 
-# Install in your project
+# Install in your project (auto-detects Claude Code / Roo Code)
 ./sherlock/install.sh /path/to/your/project
 
-# In Claude Code, inside your project:
+# Or force a specific target
+./sherlock/install.sh /path/to/your/project --claude
+./sherlock/install.sh /path/to/your/project --roo
+./sherlock/install.sh /path/to/your/project --all
+
+# Then use the slash commands in Claude Code or Roo Code:
 /review              # Full PR review against main
 /review-pr           # Same as /review but posts inline comments on GitHub PR
 /review-quick        # Ultra-fast gate check
@@ -276,7 +281,7 @@ The data collection scripts are plain bash — they work without Claude Code. Yo
 ```yaml
 # Example: standalone pipeline step
 - name: Collect PR data
-  run: .claude/scripts/collect-pr-data.sh --base=${{ github.event.pull_request.base.ref }}
+  run: .sherlock/scripts/collect-pr-data.sh --base=${{ github.event.pull_request.base.ref }}
 
 - name: Review with Claude API
   run: |
@@ -289,6 +294,34 @@ The data collection scripts are plain bash — they work without Claude Code. Yo
 This approach gives full control over cost and output format.
 
 ## Compatibility
+
+### Multi-Editor Support
+
+Sherlock supports both Claude Code and Roo Code. The installer auto-detects which is present:
+
+```bash
+# Auto-detect (installs for whichever is found)
+./install.sh /your/project
+
+# Or be explicit
+./install.sh /your/project --claude    # Claude Code only
+./install.sh /your/project --roo       # Roo Code only
+./install.sh /your/project --all       # Both
+```
+
+**How it maps:**
+
+| Component | Claude Code | Roo Code |
+|---|---|---|
+| Commands | `.claude/commands/*.md` | `.roo/commands/*.md` |
+| Rules | `.claude/rules/*.md` | `.roo/rules/*.md` |
+| Scripts | `.sherlock/scripts/` (shared) | `.sherlock/scripts/` (shared) |
+| Permissions | `.claude/settings.local.json` | `.roomodes` (custom mode) |
+| Runtime output | `.review/` | `.review/` |
+
+Scripts live in `.sherlock/scripts/` — a neutral path shared by both editors. Commands and rules are symlinked to each editor's expected directory. The prompt content is identical.
+
+For Roo Code, the installer creates a `sherlock` custom mode with read + command permissions. You can use it directly or run the slash commands from any mode.
 
 ### With Alfred (Code Quality Toolkit)
 
@@ -303,12 +336,10 @@ Sherlock and Alfred can coexist in the same project with zero conflicts:
 | Component | Alfred | Sherlock | Conflict? |
 |---|---|---|---|
 | Commands | `quality-*` | `review-*` | No |
-| Scripts | `collect-quality-data.sh`, `validate-*.sh` | `collect-pr-data.sh`, `classify-files.sh`, `filter-noise.sh` | No |
+| Scripts | `.claude/scripts/validate-*.sh` | `.sherlock/scripts/collect-*.sh` | No |
 | Rules | `SEPARATION.md`, `DRY.md`, etc. | `SEVERITY.md`, `TOKEN-ECONOMY.md`, `REVIEW-PRINCIPLES.md` | No |
 | Runtime dir | `.quality/` | `.review/` | No |
 | Permissions | Merged via `jq` | Merged via `jq` | No |
-
-The install script merges `settings.local.json` permissions automatically using `jq`.
 
 ### With Claude Code Review (REVIEW.md)
 
@@ -317,35 +348,52 @@ If your project has a `REVIEW.md` file (used by Claude's managed Code Review ser
 ## Installation
 
 ```bash
-# Install (creates granular symlinks — safe for projects with existing .claude/)
+# Install (auto-detects Claude Code / Roo Code)
 ./install.sh /path/to/your/project
+
+# Install for specific target
+./install.sh /path/to/your/project --all
 
 # Uninstall (removes only Sherlock files, preserves everything else)
 ./uninstall.sh /path/to/your/project
 ```
 
-The installer creates individual symlinks for each file rather than symlinking the entire `.claude/` directory. This means other toolkits, custom commands, and project-specific rules are left untouched.
+The installer creates individual symlinks for each file. Scripts go to `.sherlock/scripts/` (neutral), commands and rules go to each editor's directory. Other toolkits, custom commands, and project-specific rules are left untouched.
 
 ## Project Structure
 
 ```
 sherlock/
-├── install.sh                    # Granular symlink installer
+├── install.sh                    # Multi-target symlink installer
 ├── uninstall.sh                  # Clean removal (preserves other toolkits)
-├── commands/
+├── commands/                     # Slash commands (symlinked to .claude/ and/or .roo/)
 │   ├── review.md                 # /review — Full PR review (terminal output)
 │   ├── review-pr.md              # /review-pr — Posts inline comments on GitHub PR
 │   ├── review-quick.md           # /review-quick — Gate check
 │   └── review-commit.md          # /review-commit — Commit review
-├── scripts/
+├── scripts/                      # Bash scripts (symlinked to .sherlock/scripts/)
 │   ├── collect-pr-data.sh        # Data collection orchestrator (parallel)
 │   ├── classify-files.sh         # File categorization engine
 │   └── filter-noise.sh           # Diff noise removal (40-70% reduction)
-├── rules/
+├── rules/                        # AI rules (symlinked to .claude/ and/or .roo/)
 │   ├── SEVERITY.md               # Inverted severity model
 │   ├── TOKEN-ECONOMY.md          # Token optimization rules for AI
 │   └── REVIEW-PRINCIPLES.md      # 5 review categories
-└── settings.local.json           # Claude Code permissions
+└── settings.local.json           # Claude Code permissions template
+```
+
+When installed in a project:
+
+```
+your-project/
+├── .sherlock/scripts/             # Shared scripts (neutral path)
+├── .claude/                       # Claude Code (if detected)
+│   ├── commands/review*.md        # → symlinks to sherlock/commands/
+│   └── rules/SEVERITY.md (etc)   # → symlinks to sherlock/rules/
+├── .roo/                          # Roo Code (if detected)
+│   ├── commands/review*.md        # → symlinks to sherlock/commands/
+│   └── rules/SEVERITY.md (etc)   # → symlinks to sherlock/rules/
+└── .review/                       # Runtime output (gitignored)
 ```
 
 ## License

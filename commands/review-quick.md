@@ -10,7 +10,7 @@ Ultra-fast gate check. No deep logic analysis. Checks automated signals only.
 ## Step 1: Collect data
 
 ```bash
-.claude/scripts/collect-pr-data.sh --quick $ARGUMENTS
+.sherlock/scripts/collect-pr-data.sh --quick $ARGUMENTS
 ```
 
 ## Step 2: Read stats only

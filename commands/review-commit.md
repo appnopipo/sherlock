@@ -16,7 +16,7 @@ Review specific commit(s). Uses the same analysis pipeline as /review but scoped
 ## Step 1: Collect data
 
 ```bash
-.claude/scripts/collect-pr-data.sh --commit=$ARGUMENTS
+.sherlock/scripts/collect-pr-data.sh --commit=$ARGUMENTS
 ```
 
 If no argument was provided, use `--commit=last`.

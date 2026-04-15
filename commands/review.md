@@ -12,7 +12,7 @@ Review the current branch's changes against the base branch.
 Run the collection script:
 
 ```bash
-.claude/scripts/collect-pr-data.sh $ARGUMENTS
+.sherlock/scripts/collect-pr-data.sh $ARGUMENTS
 ```
 
 ## Phase 2: Triage

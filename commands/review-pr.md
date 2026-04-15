@@ -11,7 +11,7 @@ Each finding appears on the exact line of the diff where the issue was found.
 ## Phase 1: Data Collection
 
 ```bash
-.claude/scripts/collect-pr-data.sh $ARGUMENTS
+.sherlock/scripts/collect-pr-data.sh $ARGUMENTS
 ```
 
 ## Phase 2: Triage
