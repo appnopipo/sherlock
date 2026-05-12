@@ -21,12 +21,33 @@ REVIEW_DIR=".review"
 BASE_BRANCH=""
 COMMIT_MODE=""
 QUICK=0
+PR_URL=""
 
 for arg in "$@"; do
   case "$arg" in
     --base=*) BASE_BRANCH="${arg#--base=}" ;;
     --commit=*) COMMIT_MODE="${arg#--commit=}" ;;
     --quick) QUICK=1 ;;
+    https://github.com/*/pull/*)
+      # GitHub PR URL — extract owner/repo and PR number, resolve via gh CLI
+      PR_URL="$arg"
+      PR_REPO=$(echo "$arg" | sed -E 's|https://github.com/([^/]+/[^/]+)/pull/.*|\1|')
+      PR_NUMBER=$(echo "$arg" | sed -E 's|.*/pull/([0-9]+).*|\1|')
+      PR_JSON=$(gh pr view "$PR_NUMBER" --repo "$PR_REPO" --json headRefName,baseRefName 2>/dev/null || echo "")
+      if [ -z "$PR_JSON" ]; then
+        echo "ERROR: Could not fetch PR #$PR_NUMBER from $PR_REPO via gh CLI" >&2
+        exit 1
+      fi
+      PR_HEAD=$(echo "$PR_JSON" | sed -n 's/.*"headRefName":"\([^"]*\)".*/\1/p')
+      PR_BASE=$(echo "$PR_JSON" | sed -n 's/.*"baseRefName":"\([^"]*\)".*/\1/p')
+      BASE_BRANCH="${PR_BASE:-main}"
+      # Fetch and checkout the PR branch
+      git fetch origin "$PR_HEAD:refs/remotes/origin/$PR_HEAD" 2>/dev/null || true
+      git checkout "origin/$PR_HEAD" --detach 2>/dev/null || {
+        echo "ERROR: Could not checkout origin/$PR_HEAD — run: git fetch origin $PR_HEAD" >&2
+        exit 1
+      }
+      ;;
     *) BASE_BRANCH="$arg" ;;
   esac
 done

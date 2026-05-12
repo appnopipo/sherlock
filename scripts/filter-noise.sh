@@ -16,18 +16,25 @@ CLASSIFIED_FILE="${1:-}"
 DIFF_INPUT="${2:-/dev/stdin}"
 
 # Build skip list from classified files (lockfile + generated + asset)
-declare -A SKIP_FILES
+# Uses a newline-separated string instead of associative arrays (bash 3.2 compat)
+SKIP_FILES=""
 if [ -n "$CLASSIFIED_FILE" ] && [ -f "$CLASSIFIED_FILE" ]; then
   while IFS= read -r line; do
     category="${line%%:*}"
     filepath="${line#*:}"
     case "$category" in
       lockfile|generated|asset)
-        SKIP_FILES["$filepath"]=1
+        SKIP_FILES="$SKIP_FILES
+$filepath"
         ;;
     esac
   done < "$CLASSIFIED_FILE"
 fi
+
+# Check if a file is in the skip list
+is_skipped() {
+  echo "$SKIP_FILES" | grep -qFx "$1" 2>/dev/null
+}
 
 # State machine to process unified diff
 current_file=""
@@ -51,21 +58,22 @@ flush_hunk() {
 
     # Check import-only: all added/removed lines are imports or empty
     local non_import=0
-    while IFS= read -r line; do
-      case "$line" in
-        +import*|+\"use *|+'use *|-import*|-\"use *|-'use *|+|-)
-          ;; # import or empty line — ok
-        +*|-*)
-          # Strip leading +/- and whitespace
-          local content="${line:1}"
-          content="${content#"${content%%[![:space:]]*}"}"
-          if [ -n "$content" ]; then
-            non_import=1
-            break
-          fi
-          ;;
-      esac
-    done <<< "$(echo "$hunk_buffer" | grep "^[+-]" | grep -v "^[+-][+-][+-]")"
+    local changed_lines
+    changed_lines=$(echo "$hunk_buffer" | grep "^[+-]" | grep -v "^[+-][+-][+-]" || true)
+    if [ -n "$changed_lines" ]; then
+      # Filter out import lines, "use" directives, and blank +/- lines
+      local remaining
+      remaining=$(echo "$changed_lines" \
+        | grep -v "^[+-]import " \
+        | grep -v "^[+-][\"']use " \
+        | grep -v "^[+-]$" \
+        | sed 's/^[+-]//' \
+        | sed 's/^[[:space:]]*//' \
+        | grep -v "^$" || true)
+      if [ -n "$remaining" ]; then
+        non_import=1
+      fi
+    fi
 
     if [ "$non_import" -eq 0 ] && [ -n "$added$removed" ]; then
       hunk_buffer=""
@@ -101,7 +109,7 @@ process_diff() {
         skip_current=0
 
         # Check skip list
-        if [ -n "${SKIP_FILES[$current_file]+x}" ]; then
+        if is_skipped "$current_file"; then
           skip_current=1
           continue
         fi
