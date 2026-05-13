@@ -22,7 +22,7 @@ git clone https://github.com/appnopipo/sherlock.git
 
 # Then use the slash commands in Claude Code or Roo Code:
 /review              # Full PR review against main
-/review-pr           # Same as /review but posts inline comments on GitHub PR
+/review-pr           # Posts inline comments on GitHub PR (also accepts a PR URL)
 /review-quick        # Ultra-fast gate check
 /review-commit last  # Review the last commit
 ```
@@ -156,13 +156,14 @@ Review specific commit(s). Same analysis pipeline as `/review` but scoped to com
 /review-commit abc1234      # Review specific commit
 ```
 
-### `/review-pr [base-branch]`
+### `/review-pr [base-branch | PR-URL]`
 
 Same analysis as `/review`, but instead of terminal output, **posts findings as inline comments directly on the GitHub PR**. Each issue appears on the exact line of the diff where it was found.
 
 ```
-/review-pr              # Auto-detects base branch
-/review-pr develop      # Diff against develop
+/review-pr                                              # Auto-detects base branch
+/review-pr develop                                      # Diff against develop
+/review-pr https://github.com/owner/repo/pull/123       # Review a specific PR by URL
 ```
 
 Requires: `gh` CLI authenticated with repo access.
