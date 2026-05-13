@@ -31,9 +31,15 @@ If `.review/project-review-guidelines.txt` exists, read it for project guideline
 **Review depth based on diff_filtered_lines:**
 - **< 50 lines**: Single pass
 - **50–300 lines**: Focus on source files
-- **> 300 lines**: File-by-file, highest-churn first
+- **> 300 lines**: Chunked review (see Phase 3B)
 
-## Phase 3: Review the Filtered Diff
+## Phase 3: Review the Diff
+
+Check if `.review/chunks/manifest.txt` exists:
+- **If NO chunks** (small/medium PR): follow **Phase 3A**
+- **If chunks exist** (large PR): follow **Phase 3B**
+
+### Phase 3A: Single-Pass Review
 
 Read `.review/diff-filtered.patch`.
 
@@ -55,6 +61,46 @@ For each finding, capture:
 - Missing tests for configuration or type-only files
 - "Complex" code that is inherently complex domain logic
 - Style preferences that aren't bugs
+
+### Phase 3B: Chunked Review (large PRs)
+
+Read `.review/chunks/manifest.txt` to see chunk layout (format: `chunk-name|file-count|line-count|modules`).
+
+**For each chunk**, use the **Agent tool** (subagent) to review in parallel. Each subagent receives:
+
+1. The chunk patch: `.review/chunks/<chunk-name>.patch`
+2. Review principles and severity rules
+3. Context from `.review/commits.txt`
+
+**Subagent prompt template:**
+```
+Review this code diff chunk as part of a larger PR review.
+
+Context: [1-2 sentence summary from commits.txt]
+
+Read .review/chunks/<chunk-name>.patch and analyze for:
+- Correctness & Logic errors
+- Security vulnerabilities
+- Performance issues
+- Error handling gaps
+- Maintainability concerns
+
+For each finding, output a JSON line:
+{"file": "path/to/file.ts", "line": 42, "severity": "P2", "category": "Security", "comment": "Brief actionable description"}
+
+Rules:
+- Default severity is P4. Promote only with evidence.
+- Do NOT read full source files.
+- Only output findings — no preamble.
+- If no findings, output: {"findings": "none"}
+```
+
+After all subagents complete, **merge findings** and do a **cross-cutting synthesis**:
+- Check for related changes across chunks (API contracts, shared state)
+- Flag patterns repeating across chunks
+- Add any cross-cutting findings
+
+All merged findings feed into Phase 4 (GitHub posting) exactly as single-pass findings would.
 
 ## Phase 4: Check if GitHub posting is possible
 

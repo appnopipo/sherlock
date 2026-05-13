@@ -279,12 +279,22 @@ elif [ -f ".github/REVIEW.md" ]; then
 fi
 
 # ============================================================
+# PHASE 5: Chunk large diffs for adaptive review
+# ============================================================
+
+FILTERED_LINES=$(wc -l < "$REVIEW_DIR/diff-filtered.patch" | tr -d ' ')
+CHUNK_THRESHOLD=300
+
+if [ "$FILTERED_LINES" -gt "$CHUNK_THRESHOLD" ] && [ -f "$SCRIPT_DIR/chunk-diff.sh" ]; then
+  "$SCRIPT_DIR/chunk-diff.sh" "$REVIEW_DIR/diff-filtered.patch" "$REVIEW_DIR/files-classified.txt" 500
+fi
+
+# ============================================================
 # Summary
 # ============================================================
 
 FILTERED_SAVINGS=""
 FULL_LINES=$(wc -l < "$REVIEW_DIR/diff-full.patch" | tr -d ' ')
-FILTERED_LINES=$(wc -l < "$REVIEW_DIR/diff-filtered.patch" | tr -d ' ')
 if [ "$FULL_LINES" -gt 0 ]; then
   SAVINGS=$(( (FULL_LINES - FILTERED_LINES) * 100 / FULL_LINES ))
   FILTERED_SAVINGS=" (${SAVINGS}% noise removed)"
@@ -296,5 +306,9 @@ echo "========================================="
 echo "Range: $RANGE_DESC"
 echo "Files: $TOTAL_FILES total ($SOURCE_FILES source, $TEST_FILES test, $LOCK_FILES lock, $GENERATED_FILES generated)"
 echo "Diff: ${FULL_LINES} lines raw → ${FILTERED_LINES} lines filtered${FILTERED_SAVINGS}"
+if [ -f "$REVIEW_DIR/chunks/manifest.txt" ]; then
+  CHUNK_COUNT=$(wc -l < "$REVIEW_DIR/chunks/manifest.txt" | tr -d ' ')
+  echo "Chunks: ${CHUNK_COUNT} (adaptive review enabled)"
+fi
 echo "Output: $REVIEW_DIR/"
 echo "========================================="

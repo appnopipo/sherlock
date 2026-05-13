@@ -36,7 +36,7 @@ git clone https://github.com/appnopipo/sherlock.git
 |---|---|
 | AI reads entire files to review a 5-line change | Bash pre-computes the filtered diff — AI never reads full files |
 | Lockfile diffs waste thousands of tokens | `filter-noise.sh` strips lockfiles, formatting-only changes, import reordering |
-| Multiple agents re-read the same diff | Single-agent architecture — one pass through the diff |
+| Large PRs (50+ files) get shallow reviews | Adaptive chunking splits diffs by module for parallel, focused analysis |
 | Reviews take minutes and cost $15-25 | Targets <30s AI time, ~4k tokens for a medium PR |
 | False positives flood the review | Inverted severity model — everything starts at P4, promoted only with evidence |
 | Can't coexist with other Claude Code toolkits | Granular symlink installer — no conflicts with Alfred or other tools |
@@ -51,6 +51,7 @@ git clone https://github.com/appnopipo/sherlock.git
     ├── git diff -U3 (3-line context saves 20% vs default)
     ├── classify-files.sh → source / test / config / lock / generated
     ├── filter-noise.sh → strips lockfiles, formatting, imports (40-70% smaller)
+    ├── chunk-diff.sh → splits large diffs into ~500-line chunks by module
     ├── [parallel] eslint --format compact on changed source files
     ├── [parallel] tsc --noEmit filtered to changed files
     ├── [parallel] test file existence check
@@ -61,9 +62,11 @@ git clone https://github.com/appnopipo/sherlock.git
     → Decides review depth based on diff size
     │
     ▼
-[Phase 3] AI reads filtered diff (single read)
-    → Analyzes against 5 categories
-    → Fetches extra context ONLY for suspected P1/P2 issues
+[Phase 3] AI reviews the diff (adaptive strategy)
+    → Small PR (< 300 lines): single-pass through filtered diff
+    → Large PR (> 300 lines): parallel chunk review via subagents
+      → Each chunk ~500 lines, grouped by module/directory
+      → Cross-cutting synthesis pass after all chunks complete
     │
     ▼
 [Phase 4] Structured output (<200 lines)
@@ -71,7 +74,19 @@ git clone https://github.com/appnopipo/sherlock.git
     → No code snippets — file:line references only
 ```
 
+### Adaptive Chunking
+
+For PRs with more than 300 filtered diff lines (~15+ source files), Sherlock automatically splits the diff into chunks grouped by module/directory. This solves three problems with large PRs:
+
+1. **Attention quality** — LLMs lose focus on long inputs ("lost in the middle"). Chunks keep analysis focused.
+2. **Parallelization** — Each chunk is reviewed by an independent subagent, so large PRs don't take proportionally longer.
+3. **Resilience** — If one chunk fails, the rest still complete.
+
+The chunking is automatic — `collect-pr-data.sh` detects when the filtered diff exceeds the threshold and generates `.review/chunks/` with a manifest. The review commands detect chunks and switch strategy transparently.
+
 ### Token Budget
+
+**Small/Medium PR** (~150 filtered lines, single-pass):
 
 | Component | Tokens |
 |---|---|
@@ -81,6 +96,19 @@ git clone https://github.com/appnopipo/sherlock.git
 | Filtered diff (medium PR, ~150 lines) | ~2,000 |
 | Output | ~500 |
 | **Total** | **~4,000** |
+
+**Large PR** (~3,000 filtered lines, 6 chunks):
+
+| Component | Tokens |
+|---|---|
+| Command prompt + rules (per chunk) | 6 × ~1,500 = ~9,000 |
+| Chunk diffs (~500 lines each) | 6 × ~3,000 = ~18,000 |
+| Chunk outputs | 6 × ~500 = ~3,000 |
+| Synthesis pass (findings only) | ~2,000 |
+| Final output | ~1,000 |
+| **Total** | **~33,000** |
+
+The chunked approach costs ~2-3x more tokens than a hypothetical single-pass, but a single-pass on 3,000 lines produces significantly lower-quality findings. The cost per *useful finding* is better with chunks.
 
 A naive approach reading full files: 20,000–50,000 tokens for the same PR.
 
@@ -375,7 +403,8 @@ sherlock/
 ├── scripts/                      # Bash scripts (symlinked to .sherlock/scripts/)
 │   ├── collect-pr-data.sh        # Data collection orchestrator (parallel)
 │   ├── classify-files.sh         # File categorization engine
-│   └── filter-noise.sh           # Diff noise removal (40-70% reduction)
+│   ├── filter-noise.sh           # Diff noise removal (40-70% reduction)
+│   └── chunk-diff.sh             # Adaptive diff chunking for large PRs
 ├── rules/                        # AI rules (symlinked to .claude/ and/or .roo/)
 │   ├── SEVERITY.md               # Inverted severity model
 │   ├── TOKEN-ECONOMY.md          # Token optimization rules for AI
@@ -395,6 +424,7 @@ your-project/
 │   ├── commands/review*.md        # → symlinks to sherlock/commands/
 │   └── rules/SEVERITY.md (etc)   # → symlinks to sherlock/rules/
 └── .review/                       # Runtime output (gitignored)
+    └── chunks/                    # Auto-generated for large PRs (>300 lines)
 ```
 
 ## License

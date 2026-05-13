@@ -34,9 +34,15 @@ If `.review/project-review-guidelines.txt` exists, read it — these are the pro
 **Decide review depth based on diff_filtered_lines from stats:**
 - **< 50 lines**: Single pass, read entire filtered diff
 - **50–300 lines**: Read filtered diff, focus analysis on source files
-- **> 300 lines**: Read diff file-by-file, prioritize highest-churn source files
+- **> 300 lines**: Chunked review (see Phase 3B)
 
-## Phase 3: Review the Filtered Diff
+## Phase 3: Review the Diff
+
+Check if `.review/chunks/manifest.txt` exists:
+- **If NO chunks** (small/medium PR): follow **Phase 3A** (single-pass)
+- **If chunks exist** (large PR): follow **Phase 3B** (chunked review)
+
+### Phase 3A: Single-Pass Review (< 300 filtered lines)
 
 Read `.review/diff-filtered.patch`.
 
@@ -59,6 +65,50 @@ For each potential finding:
 - Missing tests for configuration or type-only files
 - "Complex" code that is inherently complex domain logic
 - Style preferences that aren't bugs
+
+### Phase 3B: Chunked Review (> 300 filtered lines)
+
+Read `.review/chunks/manifest.txt` to see chunk layout. Each line has format:
+`chunk-name|file-count|line-count|modules`
+
+**For each chunk**, use the **Agent tool** (subagent) to review it in parallel. Each subagent receives:
+
+1. The chunk patch file: `.review/chunks/<chunk-name>.patch`
+2. The review principles (REVIEW-PRINCIPLES rule)
+3. The severity definitions (SEVERITY rule)
+4. Context from `.review/commits.txt` (intent)
+
+**Subagent prompt template:**
+```
+Review this code diff chunk as part of a larger PR review.
+
+Context: [paste 1-2 sentence summary from commits.txt]
+
+Read the file .review/chunks/<chunk-name>.patch and analyze it against these principles:
+- Correctness & Logic errors
+- Security vulnerabilities
+- Performance issues
+- Error handling gaps
+- Maintainability concerns
+
+For each finding, output a JSON line:
+{"file": "path/to/file.ts", "line": 42, "severity": "P2", "category": "Security", "comment": "Brief actionable description"}
+
+Rules:
+- Default severity is P4. Promote only with evidence.
+- Do NOT read full source files. The diff is sufficient.
+- Only output findings — no preamble, no summary.
+- If no findings, output: {"findings": "none"}
+```
+
+After all subagents complete, **collect and merge** all findings.
+
+**Cross-cutting synthesis**: After merging, do a quick scan of the combined findings plus `.review/files-classified.txt` to check for:
+- Related changes across chunks that interact (e.g., API contract changes)
+- Patterns that repeat across chunks (same mistake in multiple files)
+- Missing integration concerns between modules
+
+Add any cross-cutting findings to the merged list.
 
 ## Phase 4: Output
 

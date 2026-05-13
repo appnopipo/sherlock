@@ -74,6 +74,7 @@ Review specific commit(s).
 [1] Bash collects data → .review/
     ├── diff (filtered: lockfiles, formatting, imports removed)
     ├── file classification (source/test/config/generated)
+    ├── adaptive chunking (if >300 filtered lines → .review/chunks/)
     ├── lint + typecheck results (parallel)
     └── test coverage hints
     │
@@ -81,13 +82,19 @@ Review specific commit(s).
 [2] AI reads stats first (tiny — decides review depth)
     │
     ▼
-[3] AI reads filtered diff (single read — no full files)
+[3] AI reviews the diff (adaptive strategy)
+    ├── Small PR (<300 lines): single-pass through filtered diff
+    └── Large PR (>300 lines): parallel chunk review via subagents
+        → each chunk ~500 lines, grouped by module
+        → cross-cutting synthesis after all chunks complete
     │
     ▼
 [4] Structured output (<200 lines, no code snippets)
 ```
 
-**Token budget** (medium PR, ~150 lines): ~4,000 tokens vs. ~30,000 naive approach.
+**Token budget**:
+- Small/medium PR (~150 lines): ~4,000 tokens vs. ~30,000 naive approach
+- Large PR (~3,000 lines, 6 chunks): ~33,000 tokens with high-quality per-chunk analysis
 
 ## Multi-Editor Support
 
@@ -196,7 +203,8 @@ sherlock/
 ├── scripts/                       # Bash data collection (→ .sherlock/scripts/)
 │   ├── collect-pr-data.sh         # Orchestrator (parallel execution)
 │   ├── classify-files.sh          # File categorization
-│   └── filter-noise.sh            # Diff noise removal (40-70% reduction)
+│   ├── filter-noise.sh            # Diff noise removal (40-70% reduction)
+│   └── chunk-diff.sh              # Adaptive chunking for large PRs
 ├── rules/                         # AI rules (→ .claude/ and/or .roo/)
 │   ├── SEVERITY.md                # Inverted severity model
 │   ├── TOKEN-ECONOMY.md           # Token optimization rules
