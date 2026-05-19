@@ -4,7 +4,18 @@
 
 Sherlock is a code review toolkit that integrates with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Roo Code](https://docs.roocode.com/) to review pull requests. It was built around two priorities: **speed** (reviews complete in seconds, not minutes) and **token economy** (uses ~4k tokens for a medium PR where naive approaches consume ~30k).
 
-The key insight: Bash does the heavy lifting *before* AI sees anything. Diffs are collected, files are classified, noise is stripped, and lint/typecheck run in parallel — all before a single token is spent. The AI receives only what it needs to make decisions.
+- **Bash does the heavy lifting first** — diff collection, file classification, noise filtering, and chunking all happen before a single AI token is spent
+- **Noise removal** — lockfiles, formatting changes, and import reordering are stripped out, producing a diff 40-70% smaller than the original
+- **AI never reads full files** — it only sees the filtered diff, stats, and metadata
+- **Adaptive chunking for large PRs** — diffs over 300 lines are split into ~500-line chunks grouped by module, reviewed in parallel by independent subagents
+- **Result** — ~4k tokens for a medium PR where a naive approach would burn ~30k
+
+### Commands
+
+- `/review [base-branch]` — Full PR code review with structured findings grouped by file and severity (P1-P4)
+- `/review-pr [base-branch | PR-URL]` — Same analysis as `/review`, but posts findings as inline comments directly on the GitHub PR
+- `/review-quick [base-branch]` — Ultra-fast gate check — scans for red flags only (secrets, debugger, eval, console.log)
+- `/review-commit [sha|last|last:N]` — Review specific commit(s) using the same analysis pipeline
 
 ## Quick Start
 
