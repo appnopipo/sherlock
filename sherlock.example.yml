@@ -1,0 +1,30 @@
+# .sherlock.yml — Project-level configuration for Sherlock
+# Copy this file to your project root as .sherlock.yml
+#
+# All values below show the defaults. Uncomment and change as needed.
+
+# Number of filtered diff lines before adaptive chunking activates.
+# Lower = chunks more often (better quality on medium PRs, higher token cost).
+# Higher = single-pass for longer (lower cost, less focus per file).
+# chunk_threshold: 300
+
+# Target lines per chunk when chunking is active.
+# Files from the same module stay together even if slightly over this limit.
+# max_chunk_lines: 500
+
+# Lines of context around each hunk in the diff (-U flag).
+# Lower = fewer tokens, less surrounding context for the reviewer.
+# Higher = more context, more tokens.
+# diff_context: 3
+
+# File patterns to exclude from review (in addition to lockfiles/generated).
+# Uses glob syntax. Matched files are stripped from the filtered diff entirely.
+# ignore_patterns:
+#   - "*.stories.tsx"
+#   - "*.stories.ts"
+#   - "*.snap"
+#   - "migrations/*"
+#   - "*.generated.ts"
+#   - "__mocks__/*"
+#   - "*.min.js"
+#   - "*.min.css"

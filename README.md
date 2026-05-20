@@ -385,6 +385,29 @@ Sherlock and Alfred can coexist in the same project with zero conflicts:
 
 If your project has a `REVIEW.md` file (used by Claude's managed Code Review service), Sherlock reads it as additional review guidelines. The two systems are fully complementary.
 
+## Configuration
+
+Create a `.sherlock.yml` in your project root to customize behavior:
+
+```yaml
+# Chunking
+chunk_threshold: 300     # Filtered diff lines before chunking activates
+max_chunk_lines: 500     # Target lines per chunk
+
+# Diff
+diff_context: 3          # Lines of context around each hunk (-U flag)
+
+# Ignore patterns (glob syntax, added to lockfile/generated skip list)
+ignore_patterns:
+  - "*.stories.tsx"
+  - "*.snap"
+  - "migrations/*"
+```
+
+All values are optional — defaults are used for anything not specified. See `sherlock.example.yml` for the full reference with descriptions.
+
+**Config search order**: `.sherlock.yml` > `.sherlock.yaml` > `.sherlock/config.yml`
+
 ## Installation
 
 ```bash
@@ -415,12 +438,14 @@ sherlock/
 │   ├── collect-pr-data.sh        # Data collection orchestrator (parallel)
 │   ├── classify-files.sh         # File categorization engine
 │   ├── filter-noise.sh           # Diff noise removal (40-70% reduction)
-│   └── chunk-diff.sh             # Adaptive diff chunking for large PRs
+│   ├── chunk-diff.sh             # Adaptive diff chunking for large PRs
+│   └── parse-config.sh           # .sherlock.yml config parser
 ├── rules/                        # AI rules (symlinked to .claude/ and/or .roo/)
 │   ├── SEVERITY.md               # Inverted severity model
 │   ├── TOKEN-ECONOMY.md          # Token optimization rules for AI
 │   └── REVIEW-PRINCIPLES.md      # 5 review categories
-└── settings.local.json           # Claude Code permissions template
+├── settings.local.json           # Claude Code permissions template
+└── sherlock.example.yml          # Example .sherlock.yml config
 ```
 
 When installed in a project:

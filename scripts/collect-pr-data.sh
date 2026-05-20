@@ -17,6 +17,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REVIEW_DIR=".review"
 
+# Load project config (.sherlock.yml)
+if [ -f "$SCRIPT_DIR/parse-config.sh" ]; then
+  eval "$("$SCRIPT_DIR/parse-config.sh")"
+fi
+SHERLOCK_CHUNK_THRESHOLD="${SHERLOCK_CHUNK_THRESHOLD:-300}"
+SHERLOCK_MAX_CHUNK_LINES="${SHERLOCK_MAX_CHUNK_LINES:-500}"
+SHERLOCK_DIFF_CONTEXT="${SHERLOCK_DIFF_CONTEXT:-3}"
+SHERLOCK_IGNORE_PATTERNS="${SHERLOCK_IGNORE_PATTERNS:-}"
+
 # Parse arguments
 BASE_BRANCH=""
 COMMIT_MODE=""
@@ -138,12 +147,13 @@ else
   sed 's/^/source:/' "$REVIEW_DIR/files-list.txt" > "$REVIEW_DIR/files-classified.txt"
 fi
 
-# Full diff with reduced context (3 lines instead of default 5 — saves ~20% tokens)
-git diff -U3 "$DIFF_BASE".."$DIFF_HEAD" > "$REVIEW_DIR/diff-full.patch" 2>/dev/null || true
+# Full diff with reduced context (saves ~20% tokens vs default)
+git diff -U"$SHERLOCK_DIFF_CONTEXT" "$DIFF_BASE".."$DIFF_HEAD" > "$REVIEW_DIR/diff-full.patch" 2>/dev/null || true
 
 # Filter noise from diff
 if [ -f "$SCRIPT_DIR/filter-noise.sh" ]; then
-  "$SCRIPT_DIR/filter-noise.sh" "$REVIEW_DIR/files-classified.txt" "$REVIEW_DIR/diff-full.patch" \
+  SHERLOCK_IGNORE_PATTERNS="$SHERLOCK_IGNORE_PATTERNS" \
+    "$SCRIPT_DIR/filter-noise.sh" "$REVIEW_DIR/files-classified.txt" "$REVIEW_DIR/diff-full.patch" \
     > "$REVIEW_DIR/diff-filtered.patch"
 else
   cp "$REVIEW_DIR/diff-full.patch" "$REVIEW_DIR/diff-filtered.patch"
@@ -283,10 +293,9 @@ fi
 # ============================================================
 
 FILTERED_LINES=$(wc -l < "$REVIEW_DIR/diff-filtered.patch" | tr -d ' ')
-CHUNK_THRESHOLD=300
 
-if [ "$FILTERED_LINES" -gt "$CHUNK_THRESHOLD" ] && [ -f "$SCRIPT_DIR/chunk-diff.sh" ]; then
-  "$SCRIPT_DIR/chunk-diff.sh" "$REVIEW_DIR/diff-filtered.patch" "$REVIEW_DIR/files-classified.txt" 500
+if [ "$FILTERED_LINES" -gt "$SHERLOCK_CHUNK_THRESHOLD" ] && [ -f "$SCRIPT_DIR/chunk-diff.sh" ]; then
+  "$SCRIPT_DIR/chunk-diff.sh" "$REVIEW_DIR/diff-filtered.patch" "$REVIEW_DIR/files-classified.txt" "$SHERLOCK_MAX_CHUNK_LINES"
 fi
 
 # ============================================================

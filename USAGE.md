@@ -96,6 +96,23 @@ Review specific commit(s).
 - Small/medium PR (~150 lines): ~4,000 tokens vs. ~30,000 naive approach
 - Large PR (~3,000 lines, 6 chunks): ~33,000 tokens with high-quality per-chunk analysis
 
+## Configuration
+
+Create `.sherlock.yml` in your project root to customize:
+
+```yaml
+chunk_threshold: 300     # Diff lines before chunking activates
+max_chunk_lines: 500     # Target lines per chunk
+diff_context: 3          # Context lines around each hunk
+
+ignore_patterns:         # Files to exclude from review
+  - "*.stories.tsx"
+  - "*.snap"
+  - "migrations/*"
+```
+
+All optional. See `sherlock.example.yml` for full reference.
+
 ## Multi-Editor Support
 
 The installer auto-detects which editor(s) your project uses:
@@ -204,10 +221,12 @@ sherlock/
 │   ├── collect-pr-data.sh         # Orchestrator (parallel execution)
 │   ├── classify-files.sh          # File categorization
 │   ├── filter-noise.sh            # Diff noise removal (40-70% reduction)
-│   └── chunk-diff.sh              # Adaptive chunking for large PRs
+│   ├── chunk-diff.sh              # Adaptive chunking for large PRs
+│   └── parse-config.sh            # .sherlock.yml config parser
 ├── rules/                         # AI rules (→ .claude/ and/or .roo/)
 │   ├── SEVERITY.md                # Inverted severity model
 │   ├── TOKEN-ECONOMY.md           # Token optimization rules
 │   └── REVIEW-PRINCIPLES.md       # 5 review categories
-└── settings.local.json            # Claude Code permissions template
+├── settings.local.json            # Claude Code permissions template
+└── sherlock.example.yml           # Example .sherlock.yml config
 ```

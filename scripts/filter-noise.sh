@@ -31,9 +31,34 @@ $filepath"
   done < "$CLASSIFIED_FILE"
 fi
 
-# Check if a file is in the skip list
+# Add ignore_patterns from .sherlock.yml (passed via SHERLOCK_IGNORE_PATTERNS env var)
+IGNORE_PATTERNS="${SHERLOCK_IGNORE_PATTERNS:-}"
+if [ -n "$IGNORE_PATTERNS" ]; then
+  # Unescape \n to real newlines
+  IGNORE_PATTERNS=$(printf '%b' "$IGNORE_PATTERNS")
+fi
+
+# Check if a file matches any ignore glob pattern
+matches_ignore_pattern() {
+  local file="$1"
+  [ -z "$IGNORE_PATTERNS" ] && return 1
+  local pattern
+  while IFS= read -r pattern; do
+    [ -z "$pattern" ] && continue
+    # Use case for glob matching (bash 3.2 compatible)
+    case "$file" in
+      $pattern) return 0 ;;
+    esac
+  done <<EOF
+$IGNORE_PATTERNS
+EOF
+  return 1
+}
+
+# Check if a file is in the skip list or matches an ignore pattern
 is_skipped() {
-  echo "$SKIP_FILES" | grep -qFx "$1" 2>/dev/null
+  echo "$SKIP_FILES" | grep -qFx "$1" 2>/dev/null && return 0
+  matches_ignore_pattern "$1"
 }
 
 # State machine to process unified diff
