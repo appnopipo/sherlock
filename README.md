@@ -445,7 +445,14 @@ sherlock/
 │   ├── TOKEN-ECONOMY.md          # Token optimization rules for AI
 │   └── REVIEW-PRINCIPLES.md      # 5 review categories
 ├── settings.local.json           # Claude Code permissions template
-└── sherlock.example.yml          # Example .sherlock.yml config
+├── sherlock.example.yml          # Example .sherlock.yml config
+└── tests/                        # Test suite (144 tests, no dependencies)
+    ├── run.sh                    # Test runner
+    ├── test-classify.sh          # File classification (44 tests)
+    ├── test-parse-config.sh      # Config parsing (33 tests)
+    ├── test-filter-noise.sh      # Noise filtering (16 tests)
+    ├── test-chunk-diff.sh        # Adaptive chunking (19 tests)
+    └── test-integration.sh       # End-to-end pipeline (31 tests)
 ```
 
 When installed in a project:
@@ -462,6 +469,22 @@ your-project/
 └── .review/                       # Runtime output (gitignored)
     └── chunks/                    # Auto-generated for large PRs (>300 lines)
 ```
+
+## Testing
+
+```bash
+# Run all tests (144 tests across 5 suites)
+./tests/run.sh
+
+# Run a specific suite
+./tests/run.sh classify
+./tests/run.sh parse-config
+./tests/run.sh filter-noise
+./tests/run.sh chunk-diff
+./tests/run.sh integration
+```
+
+Pure bash, no dependencies. Creates temporary git repos for integration tests, cleans up automatically.
 
 ## License
 
